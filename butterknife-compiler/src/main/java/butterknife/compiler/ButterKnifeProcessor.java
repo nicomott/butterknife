@@ -48,11 +48,13 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+
 import javax.annotation.processing.AbstractProcessor;
 import javax.annotation.processing.Filer;
 import javax.annotation.processing.ProcessingEnvironment;
@@ -123,6 +125,9 @@ public final class ButterKnifeProcessor extends AbstractProcessor {
 
   private final RScanner rScanner = new RScanner();
 
+  private final Map<QualifiedId, Id> symbols = new LinkedHashMap<>();
+  private HashMap<String, List<Element>> mapGeneratedFileToOriginatingElements = new LinkedHashMap<>();
+
   @Override public synchronized void init(ProcessingEnvironment env) {
     super.init(env);
 
@@ -188,15 +193,20 @@ public final class ButterKnifeProcessor extends AbstractProcessor {
       TypeElement typeElement = entry.getKey();
       BindingSet binding = entry.getValue();
 
-      JavaFile javaFile = binding.brewJava(sdk, debuggable);
+      JavaFile javaFile = binding.brewJava(sdk, debuggable, typeElement);
       try {
         javaFile.writeTo(filer);
+        mapGeneratedFileToOriginatingElements.put(javaFile.toJavaFileObject().getName(), javaFile.typeSpec.originatingElements);
       } catch (IOException e) {
         error(typeElement, "Unable to write binding for type %s: %s", typeElement, e.getMessage());
       }
     }
 
     return false;
+  }
+
+  public HashMap<String, List<Element>> getMapGeneratedFileToOriginatingElements() {
+    return mapGeneratedFileToOriginatingElements;
   }
 
   private Map<TypeElement, BindingSet> findAndParseTargets(RoundEnvironment env) {
